@@ -55,8 +55,6 @@ RUN echo && echo 'Update apt cache' && \
     rm -rf /var/cache/apt/archives/*deb && \
     rm -rf /tmp/*    
 
-#    cmake .. && make -j6 && make install && \    
-
 # Install WASI SDK
 ENV WASI_SDK_VERSION="25.0"
 RUN echo && echo "Installing WASI SDK in final stage"
@@ -68,9 +66,9 @@ ADD wasi-sdk-pthread.cmake /wasi-sysroot/wasi-sdk-pthread.cmake
 ADD wasi-sdk.cmake /wasi-sysroot/wasi-sdk.cmake
 ADD WASI.cmake /usr/share/cmake/Modules/Platform/WASI.cmake
 # These envs help support wasm builds, but are not compatible with native builds, so leaving them out
-#ENV CFLAGS --target=wasm32-wasi --sysroot=/wasi-sysroot
-#ENV CXXFLAGS --target=wasm32-wasi --sysroot=/wasi-sysroot
-#ENV LDFLAGS --target=wasm32-wasi --sysroot=/wasi-sysroot
+#ENV CFLAGS --target=wasm32-wasip2 --sysroot=/wasi-sysroot
+#ENV CXXFLAGS --target=wasm32-wasip2 --sysroot=/wasi-sysroot
+#ENV LDFLAGS --target=wasm32-wasip2 --sysroot=/wasi-sysroot
 #ENV LD wasm-ld-${LLVM_VERSION}
 
 # Install Rust support
