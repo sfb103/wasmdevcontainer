@@ -6,8 +6,8 @@ USER root
 # Install WASI SDK
 ENV WASI_SDK_VERSION="25.0"
 RUN echo && echo "Installing WASI SDK in intermediate stage"
-ADD wasi-sysroot-$WASI_SDK_VERSION.tar.gz /
-ADD libclang_rt.builtins-wasm32-wasi-$WASI_SDK_VERSION.tar.gz /wasi-sysroot-clang_rt
+ADD wasi-sysroot-${WASI_SDK_VERSION}.tar.gz /
+ADD libclang_rt.builtins-wasm32-wasi-${WASI_SDK_VERSION}.tar.gz /wasi-sysroot-clang_rt
 
 
 FROM docker.io/library/ubuntu:24.04
@@ -41,8 +41,8 @@ RUN echo && echo 'Update apt cache' && \
     curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor > /etc/apt/trusted.gpg.d/llvm.gpg && \
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/llvm.gpg] https://apt.llvm.org/noble llvm-toolchain-noble-${LLVM_VERSION} main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb-src [signed-by=/etc/apt/trusted.gpg.d/llvm.gpg] https://apt.llvm.org/noble llvm-toolchain-noble-${LLVM_VERSION} main" >> /etc/apt/sources.list.d/llvm.list && \
-    apt-get install -y clang-$LLVM_VERSION lld-$LLVM_VERSION && \
-    cd /usr/bin && ln -s clang-17 clang && ln -s clang++-17 clang++ && ln -s lld-17 lld && \
+    apt-get update && apt-get install -y clang-${LLVM_VERSION} lld-${LLVM_VERSION} && \
+    cd /usr/bin && ln -s clang-${LLVM_VERSION} clang && ln -s clang++-${LLVM_VERSION} clang++ && ln -s lld-${LLVM_VERSION} lld && \
     cd /usr/src/googletest/ && \
     mkdir build && cd build && \
     cmake -GNinja .. && \
@@ -114,10 +114,10 @@ RUN echo && \
                libaprutil1-dev libssl-dev openssl xz-utils \
                protobuf-compiler libprotobuf-dev \
                wabt \
-               clang-$LLVM_VERSION lld-$LLVM_VERSION \
+               clang-${LLVM_VERSION} lld-${LLVM_VERSION}  \
                ; do \
     echo -n $pkg && apt-cache policy $pkg | grep Installed; done && \
-    echo "WASI SDK Version $WASI_SDK_VERSION" && \
+    echo "WASI SDK Version ${WASI_SDK_VERSION}" && \
     cargo -V && \
     go version && \
     tinygo version &&\
