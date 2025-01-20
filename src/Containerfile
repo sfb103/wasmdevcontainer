@@ -1,0 +1,134 @@
+FROM docker.io/library/ubuntu:24.04 AS wasi_sdk
+LABEL maintainer="Sean Bentley <sfb103@gmail.com>"
+
+USER root
+
+# Install WASI SDK
+ENV WASI_SDK_VERSION="25.0"
+RUN echo && echo "Installing WASI SDK in intermediate stage"
+ADD wasi-sysroot-$WASI_SDK_VERSION.tar.gz /
+ADD libclang_rt.builtins-wasm32-wasi-$WASI_SDK_VERSION.tar.gz /wasi-sysroot-clang_rt
+
+
+FROM docker.io/library/ubuntu:24.04
+LABEL maintainer="Sean Bentley <sfb103@gmail.com>"
+
+USER root
+
+# Install all the build dependencies we'll retrieve via apt-get
+ENV LLVM_VERSION="18"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+ENV CC="clang-${LLVM_VERSION}"
+ENV CXX="clang++-${LLVM_VERSION}"
+ENV AR="llvm-ar-${LLVM_VERSION}"
+ENV RANLIB="llvm-ranlib-${LLVM_VERSION}"
+RUN echo && echo 'Update apt cache' && \
+    apt-get update && apt-get upgrade -y && \
+    \
+    echo && echo "Installing dev tools" && \
+    apt-get install -y git git-lfs vim vim-tiny net-tools iputils-ping dnsutils bash-completion nano tree curl \
+                       unzip apt-transport-https ca-certificates gnupg libtool autoconf automake pkg-config gcc \
+                       cmake ninja-build autogen libgtest-dev libboost-all-dev build-essential libapr1-dev \
+                       libaprutil1-dev libssl-dev openssl xz-utils && \
+    \
+    echo && echo "Installing protobuf compiler" && \
+    apt-get install -y protobuf-compiler libprotobuf-dev && \
+    \
+    echo && echo "Installing wabt" && \
+    apt-get install -y wabt && \
+    \
+    echo && echo "Installing clang and LLVM support" && \    
+    curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor > /etc/apt/trusted.gpg.d/llvm.gpg && \
+    echo "deb [signed-by=/etc/apt/trusted.gpg.d/llvm.gpg] https://apt.llvm.org/noble llvm-toolchain-noble-${LLVM_VERSION} main" >> /etc/apt/sources.list.d/llvm.list && \
+    echo "deb-src [signed-by=/etc/apt/trusted.gpg.d/llvm.gpg] https://apt.llvm.org/noble llvm-toolchain-noble-${LLVM_VERSION} main" >> /etc/apt/sources.list.d/llvm.list && \
+    apt-get install -y clang-$LLVM_VERSION lld-$LLVM_VERSION && \
+    cd /usr/bin && ln -s clang-17 clang && ln -s clang++-17 clang++ && ln -s lld-17 lld && \
+    cd /usr/src/googletest/ && \
+    mkdir build && cd build && \
+    cmake -GNinja .. && \
+    cmake --build . --target install && ldconfig && \
+    \
+    echo && echo 'Clean up apt' && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/apt/archives/*deb && \
+    rm -rf /tmp/*    
+
+#    cmake .. && make -j6 && make install && \    
+
+# Install WASI SDK
+ENV WASI_SDK_VERSION="25.0"
+RUN echo && echo "Installing WASI SDK in final stage"
+COPY --from=wasi_sdk /wasi-sysroot-${WASI_SDK_VERSION}/ /wasi-sysroot/
+COPY --from=wasi_sdk /wasi-sysroot-clang_rt/libclang_rt.builtins-wasm32-wasi-${WASI_SDK_VERSION} /usr/lib/llvm-${LLVM_VERSION}/lib/clang/${LLVM_VERSION}/lib/wasi
+ADD wasi-sdk-p1.cmake /wasi-sysroot/wasi-sdk-p1.cmake
+ADD wasi-sdk-p2.cmake /wasi-sysroot/wasi-sdk-p2.cmake
+ADD wasi-sdk-pthread.cmake /wasi-sysroot/wasi-sdk-pthread.cmake
+ADD wasi-sdk.cmake /wasi-sysroot/wasi-sdk.cmake
+ADD WASI.cmake /usr/share/cmake/Modules/Platform/WASI.cmake
+# These envs help support wasm builds, but are not compatible with native builds, so leaving them out
+#ENV CFLAGS --target=wasm32-wasi --sysroot=/wasi-sysroot
+#ENV CXXFLAGS --target=wasm32-wasi --sysroot=/wasi-sysroot
+#ENV LDFLAGS --target=wasm32-wasi --sysroot=/wasi-sysroot
+#ENV LD wasm-ld-${LLVM_VERSION}
+
+# Install Rust support
+ENV RUSTUP_HOME="/.rustup"
+ENV CARGO_HOME="/.cargo"
+ENV PATH="/.cargo/bin:$PATH"
+RUN echo && echo "Installing Rust support" && \
+    curl --proto '=https' --tlsv1.3 -sSfL https://sh.rustup.rs | sh -s -- -y && \
+    rustup target add wasm32-unknown-emscripten && \
+    rustup target add wasm32-unknown-unknown && \
+    rustup target add wasm32-wasip1 && \
+    rustup target add wasm32-wasip1-threads && \
+    rustup target add wasm32-wasip2 && \
+    cargo install cargo-generate && \
+    cargo install cargo-component && \
+    cargo install wasm-tools && \
+    cargo install wasm-pack && \
+    rustup install stable && \
+    cargo install cargo2junit && \
+    chmod -R a+rw /.cargo /.rustup
+
+# Install Go support
+RUN echo && echo 'Installing Go and TinyGo' && \
+    curl --proto '=https' --tlsv1.3 -sSfL https://dl.google.com/go/go1.22.3.linux-amd64.tar.gz | tar -C /usr/local -zxf - && \
+    curl --proto '=https' --tlsv1.3 -sSfL https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo0.31.2.linux-amd64.tar.gz | tar -C /usr/local -zxf - 
+ENV PATH="/usr/local/go/bin:/usr/local/tinygo/bin:$PATH"
+
+# Install Wasmtime
+ENV WASMTIME_HOME="/.wasmtime"
+ENV PATH="$WASMTIME_HOME/bin:$PATH"
+RUN echo && echo "Installing Wasmtime" && \
+    curl --proto '=https' --tlsv1.3 -sSfL https://wasmtime.dev/install.sh | bash -s && \
+    chmod -R a+rw /.wasmtime
+
+USER ubuntu
+
+# Echo install versions and final ENVs, for the record
+RUN echo && \
+    echo 'Final install versions for the record' && \
+    for pkg in git git-lfs vim vim-tiny net-tools iputils-ping dnsutils bash-completion nano tree curl \
+               unzip apt-transport-https ca-certificates gnupg libtool autoconf automake pkg-config gcc \
+               cmake ninja-build autogen libtool libgtest-dev libboost-all-dev build-essential libapr1-dev \
+               libaprutil1-dev libssl-dev openssl xz-utils \
+               protobuf-compiler libprotobuf-dev \
+               wabt \
+               clang-$LLVM_VERSION lld-$LLVM_VERSION \
+               ; do \
+    echo -n $pkg && apt-cache policy $pkg | grep Installed; done && \
+    echo "WASI SDK Version $WASI_SDK_VERSION" && \
+    cargo -V && \
+    go version && \
+    tinygo version &&\
+    wasmtime -V && \    
+    echo && \
+    echo 'Final ENVs for the record' && \
+    export && \
+    echo
+
+COPY Containerfile /
+COPY *.sh /
+              
