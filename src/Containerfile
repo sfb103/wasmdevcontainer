@@ -16,12 +16,14 @@ LABEL maintainer="Sean Bentley <sfb103@gmail.com>"
 USER root
 
 # Install all the build dependencies we'll retrieve via apt-get
-ENV LLVM_VERSION="18"
+ENV LLVM_VERSION="19"
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV CC="clang-${LLVM_VERSION}"
 ENV CXX="clang++-${LLVM_VERSION}"
 ENV AR="llvm-ar-${LLVM_VERSION}"
 ENV RANLIB="llvm-ranlib-${LLVM_VERSION}"
+ENV NODE_MAJOR="23"
+ENV NPM_VERSION="11.0.0"
 RUN echo && echo 'Update apt cache' && \
     apt-get update && apt-get upgrade -y && \
     \
@@ -47,6 +49,13 @@ RUN echo && echo 'Update apt cache' && \
     mkdir build && cd build && \
     cmake -GNinja .. && \
     cmake --build . --target install && ldconfig && \
+    \
+    echo && echo 'Installing node.js and npm' && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && apt-get install -y nodejs && \
+    npm install -g npm@${NPM_VERSION} && \
+    npm install -g webpack && \
     \
     echo && echo 'Clean up apt' && \
     apt-get autoremove -y && \
@@ -114,14 +123,17 @@ RUN echo && \
                libaprutil1-dev libssl-dev openssl xz-utils \
                protobuf-compiler libprotobuf-dev \
                wabt \
-               clang-${LLVM_VERSION} lld-${LLVM_VERSION}  \
+               clang-${LLVM_VERSION} lld-${LLVM_VERSION} \
+               nodejs \
                ; do \
     echo -n $pkg && apt-cache policy $pkg | grep Installed; done && \
     echo "WASI SDK Version ${WASI_SDK_VERSION}" && \
     cargo -V && \
     go version && \
     tinygo version &&\
-    wasmtime -V && \    
+    echo "node $(node -v)" && \
+    echo "npm $(npm -v)" && \
+    wasmtime -V && \
     echo && \
     echo 'Final ENVs for the record' && \
     export && \

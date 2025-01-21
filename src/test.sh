@@ -8,12 +8,15 @@ for pkg in git git-lfs vim vim-tiny net-tools iputils-ping dnsutils bash-complet
               protobuf-compiler libprotobuf-dev \
               wabt \
               clang-$LLVM_VERSION lld-$LLVM_VERSION \
+              nodejs \
               ; do \
 echo -n $pkg && apt-cache policy $pkg | grep Installed; done && \
 echo "WASI SDK Version $WASI_SDK_VERSION" && \
 cargo -V && \
 go version && \
 tinygo version && \
+echo "node $(node -v)" && \
+echo "npm $(npm -v)" && \
 wasmtime -V && \
 echo && \
 echo 'Final ENVs for the record' && \
