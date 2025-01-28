@@ -95,6 +95,7 @@ RUN echo && echo "Installing Rust support" && \
     cargo install cargo-component && \
     cargo install wasm-tools && \
     cargo install wasm-pack && \
+    cargo install wit-bindgen-cli && \
     rustup install stable && \
     cargo install cargo2junit && \
     chmod -R a+rw /.cargo /.rustup
