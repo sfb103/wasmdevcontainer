@@ -8,6 +8,7 @@ ENV WASI_SDK_VERSION="25.0"
 RUN echo && echo "Installing WASI SDK in intermediate stage"
 ADD wasi-sysroot-${WASI_SDK_VERSION}.tar.gz /
 ADD libclang_rt.builtins-wasm32-wasi-${WASI_SDK_VERSION}.tar.gz /wasi-sysroot-clang_rt
+ADD wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux.tar.gz /
 
 
 FROM docker.io/library/ubuntu:24.04
@@ -66,9 +67,13 @@ RUN echo && echo 'Update apt cache' && \
 
 # Install WASI SDK
 ENV WASI_SDK_VERSION="25.0"
-RUN echo && echo "Installing WASI SDK in final stage"
+RUN echo && echo "Installing WASI SDK in final stage" && \
+    mkdir -p /usr/lib/llvm-${LLVM_VERSION}/lib/clang/${LLVM_VERSION}/lib/wasm32-unknown-wasip2/ && \
+    cd /usr/lib/llvm-${LLVM_VERSION}/lib/clang/${LLVM_VERSION}/lib/wasm32-unknown-wasip2/ && \
+    ln -sf ../wasi/libclang_rt.builtins-wasm32.a libclang_rt.builtins.a 
 COPY --from=wasi_sdk /wasi-sysroot-${WASI_SDK_VERSION}/ /wasi-sysroot/
 COPY --from=wasi_sdk /wasi-sysroot-clang_rt/libclang_rt.builtins-wasm32-wasi-${WASI_SDK_VERSION} /usr/lib/llvm-${LLVM_VERSION}/lib/clang/${LLVM_VERSION}/lib/wasi
+COPY --from=wasi_sdk /wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux/bin/ /usr/bin/
 ADD wasi-sdk-p1.cmake /wasi-sysroot/wasi-sdk-p1.cmake
 ADD wasi-sdk-p2.cmake /wasi-sysroot/wasi-sdk-p2.cmake
 ADD wasi-sdk-pthread.cmake /wasi-sysroot/wasi-sdk-pthread.cmake
